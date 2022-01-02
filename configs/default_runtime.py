@@ -1,0 +1,26 @@
+checkpoint_config = dict(interval=2000, by_epoch=False)
+# yapf:disable
+log_config = dict(
+    interval=50,
+    hooks=[
+        dict(type='TextLoggerHook'),
+        # dict(type='TensorboardLoggerHook'),
+    ])
+# yapf:enable
+
+# custom_hooks = [
+#     dict(type='VisualizeUnconditionalSamples',
+#          output_dir='training_samples',
+#          interval=1000)
+# ]
+
+dist_params = dict(backend='nccl')
+log_level = 'INFO'
+load_from = None
+resume_from = None
+workflow = [('train', 10000)]
+find_unused_parameters = True
+cudnn_benchmark = True
+
+total_iters = 20000
+evaluation = dict(interval=2000, metric='mIoU', pre_eval=True)

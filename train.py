@@ -17,7 +17,8 @@ from mmcv.utils import Config, DictAction, get_git_hash
 from mmseg.apis import init_random_seed, set_random_seed, train_segmentor
 from mmseg.datasets import build_dataset
 from mmseg.utils import collect_env, get_root_logger
-from mmseg.models import build_segmentor
+
+from uda.models.builder import build_uda_network
 
 
 def parse_args():
@@ -131,9 +132,7 @@ def main():
     meta['exp_name'] = osp.basename(args.config)
 
     # TODO build custom segmentor
-    model = build_segmentor(cfg.model,
-                            train_cfg=cfg.get('train_cfg'),
-                            test_cfg=cfg.get('test_cfg'))
+    model = build_uda_network(cfg.model)
     model.init_weights()
 
     # SyncBN is not support for DP
