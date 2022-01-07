@@ -199,6 +199,9 @@ def main():
     target_label = 1
 
     for i_iter in range(cfg.max_iters):
+
+        start_time = time.time()
+
         loss_seg_value = 0
         loss_adv_target_value = 0
         loss_pseudo = 0
@@ -377,11 +380,18 @@ def main():
         d1_optimizer.step()
         d2_optimizer.step()
 
-        print('iter = {0:8d}/{1:8d}, loss_seg = {2:.3f}, loss_adv = {3:.3f},\
-                loss_D1 = {4:.3f}, loss_D2 = {5:.3f}, loss_pseudo = {6:.3f}'.
-              format(i_iter, cfg.max_iters, loss_seg_value,
-                     loss_adv_target_value, loss_D_value1, loss_D_value2,
-                     loss_pseudo))
+        iter_time = time.time() - start_time
+        eta = iter_time * (cfg.max_iters - i_iter)
+        mins, s = divmod(eta, 60)
+        hours, minute = divmod(mins, 60)
+        days, hour = divmod(hours, 24)
+        ETA = f'{int(days)}天{int(hour)}小时{int(minute)}分{int(s)}秒'
+
+        print(
+            'iter-[{0:8d}/{1:8d}], loss_seg = {2:.3f}, loss_adv = {3:.3f}, loss_D1 = {4:.3f}, loss_D2 = {5:.3f}, loss_pseudo = {6:.3f}, ETA:{7}'
+            .format(i_iter, cfg.max_iters, loss_seg_value,
+                    loss_adv_target_value, loss_D_value1, loss_D_value2,
+                    loss_pseudo, ETA))
 
         if i_iter % cfg.checkpoint_config.iterval == 0 and i_iter != 0:
             print('taking snapshot ...')
