@@ -1,7 +1,7 @@
-norm_cfg = dict(type='SyncBN', requires_grad=True)
-
+# model settings
+# norm_cfg = dict(type='SyncBN', requires_grad=True)
+norm_cfg = dict(type='BN', requires_grad=True)
 model = dict(
-    type='ALDA',
     segmentor=dict(
         type='EncoderDecoder',
         backbone=dict(type='ResNetV1c',
@@ -13,13 +13,14 @@ model = dict(
                       norm_cfg=norm_cfg,
                       norm_eval=False,
                       style='pytorch',
-                      contract_dilation=True),
-        decode_head=dict(type='FCNHead',
+                      contract_dilation=True,
+                      init_cfg=dict(type='Pretrained',
+                                    checkpoint='open-mmlab://resnet50_v1c')),
+        decode_head=dict(type='ASPPHead',
                          in_channels=2048,
                          in_index=3,
                          channels=512,
-                         num_convs=2,
-                         concat_input=True,
+                         dilations=(1, 12, 24, 36),
                          dropout_ratio=0.1,
                          num_classes=19,
                          norm_cfg=norm_cfg,
@@ -27,15 +28,16 @@ model = dict(
                          loss_decode=dict(type='CrossEntropyLoss',
                                           use_sigmoid=False,
                                           loss_weight=1.0)),
-        auxiliary_head=None,
         # model training and testing settings
         train_cfg=dict(),
         test_cfg=dict(mode='whole')),
-    discriminator=dict(),
-    seg_loss=dict(),
-    alda_loss=dict(),
-    adv_weight=1.0,
-    multi_adv=True,
-    correct_loss=True,
-    reg_loss=True,
-    init_cfg=None)
+    lightnet=dict(in_channels=3,
+                  out_channels=3,
+                  base_channels=64,
+                  norm_cfg=dict(type='BN'),
+                  act_cfg=dict(type='ReLU'),
+                  num_downsampling=2,
+                  dropout_rate=0.5,
+                  num_blocks=6,
+                  init_cfg=None),
+    discriminator=dict(num_classes=19))

@@ -93,7 +93,7 @@ class MultiAdversarialNetwork(BaseModule):
                  alpha=10,
                  max_iter=10000,
                  init_cfg=None):
-        super(AdversarialNetwork, self).__init__(init_cfg=init_cfg)
+        super(MultiAdversarialNetwork, self).__init__(init_cfg=init_cfg)
         self.fc1 = Linear(in_channels, inner_channels)
         self.fc2 = Linear(inner_channels, inner_channels)
         self.fc3 = Linear(inner_channels, num_classes)

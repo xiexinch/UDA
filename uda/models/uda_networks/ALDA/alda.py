@@ -9,7 +9,7 @@ from ...builder import UDA_NETWORK, build_uda_loss
 from .adversarial_network import MultiAdversarialNetwork, AdversarialNetwork
 
 
-@UDA_NETWORK
+@UDA_NETWORK.register_module()
 class ALDA(BaseModule):
 
     def __init__(self,
@@ -22,7 +22,7 @@ class ALDA(BaseModule):
                  correct_loss=True,
                  reg_loss=True,
                  init_cfg=None):
-        super(ALDA, self).__init__(init_cfg=init_cfg)
+        super().__init__()
         self.segmentor = build_segmentor(segmentor)
         if multi_adv:
             self.adversarial_model = MultiAdversarialNetwork(**discriminator)

@@ -1,8 +1,10 @@
 from mmcv.runner import BaseModule
 from mmcv.cnn import MODELS as MMCV_MODELS
+from mmcv.utils import Registry
 
-UDA_NETWORK = MMCV_MODELS
-LOSSES = MMCV_MODELS
+MODELS = Registry('models', parent=MMCV_MODELS)
+UDA_NETWORK = MODELS
+LOSSES = MODELS
 
 
 def build_uda_network(cfg: dict) -> BaseModule:
