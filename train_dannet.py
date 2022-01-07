@@ -188,7 +188,7 @@ def main():
 
     loss_SSIM = SSIMLoss()
 
-    interp = nn.Upsample(size=cfg.target_crop_size,
+    interp = nn.Upsample(size=cfg.crop_size,
                          mode='bilinear',
                          align_corners=True)
     interp_target = nn.Upsample(size=cfg.target_crop_size,
