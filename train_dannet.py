@@ -1,11 +1,12 @@
 import argparse
+import copy
 import os
 import os.path as osp
-from re import LOCALE
 import sys
 import time
 
 import torch
+import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -13,8 +14,10 @@ from torch.utils.data import DataLoader
 import mmcv
 from mmcv.utils import Config, DictAction
 from mmcv.runner import build_optimizer
+from mmcv.parallel import MMDataParallel
 from mmseg.datasets import build_dataset, build_dataloader
 from mmseg.models import build_segmentor
+from mmseg.apis import single_gpu_test
 
 from uda.models.generators import LightImgGenerator, FCDiscriminator
 from uda.models.losses import StaticLoss, TVLoss, EXPLoss, SSIMLoss
@@ -157,14 +160,38 @@ def main():
                                shuffle=True,
                                pin_memory=True)
 
+    # evaluation dataset
+    if cfg.get('evaluation', None) is not None:
+        val_dataset = build_dataset(cfg.data.test)
+        val_dataloader = build_dataloader(
+            val_dataset,
+            samples_per_gpu=1,
+            workers_per_gpu=cfg.data.workers_per_gpu,
+            dist=False,
+            shuffle=True)
+        model.CLASSES = val_dataset.CLASSES
+        model.PALETTE = val_dataset.PALETTE
+
     trainloader_iter = iter(train_loader)
     targetloader_iter = iter(target_loader)
 
-    segmentor_optimizer = build_optimizer(model, cfg.optimizer.segmentor)
-    d1_optimizer = build_optimizer(model_D1, cfg.optimizer.discriminator)
-    d2_optimizer = build_optimizer(model_D2, cfg.optimizer.discriminator)
+    # segmentor_optimizer = build_optimizer(model, cfg.optimizer.segmentor)
+    # d1_optimizer = build_optimizer(model_D1, cfg.optimizer.discriminator)
+    # d2_optimizer = build_optimizer(model_D2, cfg.optimizer.discriminator)
 
-    segmentor_optimizer.zero_grad()
+    optimizer = optim.SGD(
+        list(model.parameters()) + list(lightnet.parameters()),  # noqa
+        lr=cfg.optimizer.segmentor.lr,
+        momentum=cfg.optimizer.segmentor.momentum,
+        weight_decay=cfg.optimizer.segmentor.weight_decay)
+
+    d1_optimizer = optim.Adam(model_D1.parameters(),
+                              lr=cfg.optimizer.discriminator.lr,
+                              betas=cfg.optimizer.discriminator.betas)
+    d2_optimizer = optim.Adam(model_D2.parameters(),
+                              lr=cfg.optimizer.discriminator.lr,
+                              betas=cfg.optimizer.discriminator.betas)
+    optimizer.zero_grad()
     d1_optimizer.zero_grad()
     d2_optimizer.zero_grad()
 
@@ -208,10 +235,9 @@ def main():
         loss_D_value1 = 0
         loss_D_value2 = 0
 
-        segmentor_optimizer.zero_grad()
-        adjust_learning_rate(cfg.lr_config.segmentor_base_lr,
-                             segmentor_optimizer, i_iter, cfg.max_iters,
-                             cfg.lr_config.power)
+        optimizer.zero_grad()
+        adjust_learning_rate(cfg.lr_config.segmentor_base_lr, optimizer,
+                             i_iter, cfg.max_iters, cfg.lr_config.power)
         d1_optimizer.zero_grad()
         adjust_learning_rate_D(cfg.lr_config.discriminator_base_lr,
                                d1_optimizer, i_iter, cfg.max_iters,
@@ -221,7 +247,7 @@ def main():
                                d2_optimizer, i_iter, cfg.max_iters,
                                cfg.lr_config.power)
 
-        torch.autograd.set_detect_anomaly(True)  # 检查反向传播报错
+        #  torch.autograd.set_detect_anomaly(True)  # 检查反向传播报错
         for sub_i in range(cfg.iter_size):
             # train G
             for param in model_D1.parameters():
@@ -376,7 +402,7 @@ def main():
             loss_D2.backward()
             loss_D_value2 += loss_D2.item()
 
-        segmentor_optimizer.step()
+        optimizer.step()
         d1_optimizer.step()
         d2_optimizer.step()
 
@@ -388,10 +414,21 @@ def main():
         ETA = f'{int(days)}天{int(hour)}小时{int(minute)}分{int(s)}秒'
 
         print(
-            'iter-[{0:8d}/{1:8d}], loss_seg = {2:.3f}, loss_adv = {3:.3f}, loss_D1 = {4:.3f}, loss_D2 = {5:.3f}, loss_pseudo = {6:.3f}, ETA:{7}'
+            'iter-[{0:8d}/{1:8d}], loss_seg = {2:.3f}, loss_adv = {3:.3f}, loss_D1 = {4:.3f}, loss_D2 = {5:.3f}, loss_pseudo = {6:.3f}, ETA:{7}'  # noqa
             .format(i_iter, cfg.max_iters, loss_seg_value,
                     loss_adv_target_value, loss_D_value1, loss_D_value2,
                     loss_pseudo, ETA))
+
+        if cfg.get('evaluation', None):
+            if i_iter % cfg.evaluation.iterval == 0 and i_iter != 0:
+                results = single_gpu_test(MMDataParallel(copy.deepcopy(model),
+                                                         device_ids=[0]),
+                                          val_dataloader,
+                                          pre_eval=True,
+                                          format_only=False)
+
+                metric = val_dataset.evaluate(results, metric='mIoU')
+                print(metric)
 
         if i_iter % cfg.checkpoint_config.iterval == 0 and i_iter != 0:
             print('taking snapshot ...')

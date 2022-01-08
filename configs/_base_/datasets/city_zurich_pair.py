@@ -84,4 +84,9 @@ data = dict(
         data_root='data/dark_zurich/train/rgb_anon',
         pair_list_path='configs/_base_/datasets/zurich_dn_pair_train.csv',
         pipeline=target_train_pipeline,
-        repeat_times=500))
+        repeat_times=500),
+    test=dict(type='DarkZurichDataset',
+              data_root='data/dark_zurich/',
+              img_dir='val/rgb_anon/val/night',
+              ann_dir='val/gt/val/night',
+              pipeline=test_pipeline))

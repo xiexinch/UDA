@@ -18,3 +18,4 @@ lr_config = dict(segmentor_base_lr=2.5e-4,
 max_iters = 50000
 iter_size = 1
 checkpoint_config = dict(iterval=5000)
+evaluation = dict(iterval=10)
