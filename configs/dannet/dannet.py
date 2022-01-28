@@ -15,7 +15,8 @@ optimizer = dict(segmentor=dict(type='SGD',
 lr_config = dict(segmentor_base_lr=2.5e-4,
                  discriminator_base_lr=1e-4,
                  power=0.9)
-max_iters = 50000
+max_iters = 20000
 iter_size = 1
-checkpoint_config = dict(iterval=5000)
-evaluation = dict(iterval=10)
+checkpoint_config = dict(iterval=2000)
+evaluation = dict(iterval=200)
+checkpoint = 'checkpoints/deeplabv3_r50-d8_512x1024_80k_cityscapes_20200606_113404-b92cfdd4.pth'

@@ -13,15 +13,17 @@ from torch.utils.data import DataLoader
 
 import mmcv
 from mmcv.utils import Config, DictAction
-from mmcv.runner import build_optimizer
+from mmcv.runner import build_optimizer, load_checkpoint
 from mmcv.parallel import MMDataParallel
 from mmseg.datasets import build_dataset, build_dataloader
 from mmseg.models import build_segmentor
-from mmseg.apis import single_gpu_test
+# from mmseg.apis import single_gpu_test
 
 from uda.models.generators import LightImgGenerator, FCDiscriminator
 from uda.models.losses import StaticLoss, TVLoss, EXPLoss, SSIMLoss
 from uda.datasets import ZurichPairDataset  # noqa
+
+from evaluation import single_gpu_test
 
 
 def lr_poly(base_lr, iter, max_iter, power):
@@ -47,7 +49,6 @@ def adjust_learning_rate_D(base_lr, optimizer, i_iter, max_iters, power):
 
 
 class Logger(object):
-
     def __init__(self, filename):
         self.terminal = sys.stdout
         self.log = open(filename, 'a')
@@ -125,7 +126,7 @@ def main():
     sys.stdout = Logger(log_file)
 
     model = build_segmentor(cfg.model.segmentor)
-    model.init_weights()
+    checkpoint = load_checkpoint(model, cfg.checkpoint, map_location='cpu')
 
     model.train()
     model.to(device)
@@ -254,7 +255,6 @@ def main():
                 param.requires_grad = False
             for param in model_D2.parameters():
                 param.requires_grad = False
-
             # train with target
             batch = next(targetloader_iter)
 
@@ -414,21 +414,25 @@ def main():
         ETA = f'{int(days)}天{int(hour)}小时{int(minute)}分{int(s)}秒'
 
         print(
-            'iter-[{0:8d}/{1:8d}], loss_seg = {2:.3f}, loss_adv = {3:.3f}, loss_D1 = {4:.3f}, loss_D2 = {5:.3f}, loss_pseudo = {6:.3f}, ETA:{7}'  # noqa
+            'iter-[{0:8d}/{1:8d}], optimizer_lr={8:.8f}, optimizer_D1_lr={9:.8f}, optimizer_D1_lr={10:.8f}, loss_seg = {2:.3f}, loss_adv = {3:.3f}, loss_D1 = {4:.3f}, loss_D2 = {5:.3f}, loss_pseudo = {6:.3f}, ETA:{7}'  # noqa
             .format(i_iter, cfg.max_iters, loss_seg_value,
                     loss_adv_target_value, loss_D_value1, loss_D_value2,
-                    loss_pseudo, ETA))
+                    loss_pseudo, ETA, optimizer.param_groups[0]['lr'],
+                    d1_optimizer.param_groups[0]['lr'],
+                    d2_optimizer.param_groups[0]['lr']))
 
         if cfg.get('evaluation', None):
-            if i_iter % cfg.evaluation.iterval == 0 and i_iter != 0:
-                results = single_gpu_test(MMDataParallel(copy.deepcopy(model),
+            if i_iter % cfg.evaluation.iterval == 0:
+                results = single_gpu_test(MMDataParallel(model,
                                                          device_ids=[0]),
+                                          lightnet,
                                           val_dataloader,
                                           pre_eval=True,
                                           format_only=False)
 
                 metric = val_dataset.evaluate(results, metric='mIoU')
                 print(metric)
+                model.train()
 
         if i_iter % cfg.checkpoint_config.iterval == 0 and i_iter != 0:
             print('taking snapshot ...')
